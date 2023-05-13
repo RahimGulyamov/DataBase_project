@@ -10,10 +10,10 @@ class TestViews(unittest.TestCase):
     # Установление соединения с базой данных перед каждым тестом
     def setUp(self):
         self.conn = psycopg2.connect(
-            dbname="pg_db",
+            dbname="postgres",
             user="postgres",
-            password="postgres",
-            host="localhost",
+            password="password",
+            host="postgres",
             port="5432"
         )
         self.cur = self.conn.cursor()

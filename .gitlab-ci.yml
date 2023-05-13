@@ -1,0 +1,67 @@
+# стейджи пайплайна
+stages:
+  - test # у этого стейджа есть стэпы: 'tasks from 3rd to 11th' & 'task 12th'
+
+# внутри пайплайна автоматически поднимается
+# пустая база Postgres (каждый раз на новый степ)
+services:
+  - name: postgres:15-alpine
+    alias: postgres
+
+
+
+variables:
+#  переменные окружения для Postgres
+  POSTGRES_DB: postgres
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: password
+  POSTGRES_HOST_AUTH_METHOD: trust
+
+#  переменные окружения для вспомогательного
+#  скрипта utils/pypsql.py и тестов
+  DBNAME: postgres
+  DBHOST: postgres
+  DBPORT: 5432
+  DBUSER: postgres
+  DBPASSWORD: password
+
+#  аккуратное формирование всяких абсолютных
+#  путей к файлам и директориям
+#  у вас будет ${PROJECT_DIR} тождественно равен ${CI_PROJECT_DIR}
+  PROJECT_DIR: ${CI_PROJECT_DIR}
+  ANALYSIS_DIR: ${PROJECT_DIR}/analysis
+  SCRIPTS_DIR: ${PROJECT_DIR}/scripts
+  TESTS_DIR: ${PROJECT_DIR}/tests
+  UTILS_DIR: ${PROJECT_DIR}/utils
+  PYPSQL: ${UTILS_DIR}/pypsql.py
+
+#  переменные для цвета в консоли (можете
+#  использовать какие-то другие свои)
+  NO_COLOUR: '\033[0m'
+  LIGHT_RED: '\033[1;31m'
+
+
+tests:
+  stage: test
+  image: python:3.9
+  services:
+    - postgres
+  before_script:
+    - apt-get update && apt-get install -y postgresql-client
+    - pip install -r ${PROJECT_DIR}/requirements.txt > /dev/null 2> /dev/null
+    - pip install colorama
+  script:
+    - psql -h $DBHOST -U $POSTGRES_USER -d $POSTGRES_DB -a -f ${SCRIPTS_DIR}/truckingdata_ddl.sql
+    - psql -h $DBHOST -U $POSTGRES_USER -d $POSTGRES_DB -a -f ${SCRIPTS_DIR}/truckingdata_inserts.sql
+    - psql -h $DBHOST -U $POSTGRES_USER -d $POSTGRES_DB -a -f ${SCRIPTS_DIR}/crud.sql
+    - psql -h $DBHOST -U $POSTGRES_USER -d $POSTGRES_DB -a -f ${SCRIPTS_DIR}/meaningful_requests.sql
+    - psql -h $DBHOST -U $POSTGRES_USER -d $POSTGRES_DB -a -f ${SCRIPTS_DIR}/views.sql
+    - psql -h $DBHOST -U $POSTGRES_USER -d $POSTGRES_DB -a -f ${SCRIPTS_DIR}/functions.sql
+    - psql -h $DBHOST -U $POSTGRES_USER -d $POSTGRES_DB -a -f ${SCRIPTS_DIR}/index.sql
+    - python -m unittest discover -s ${TESTS_DIR} -p 'test_queries.py'
+    - python -m unittest discover -s ${TESTS_DIR} -p 'test_meaningful_queries.py'
+    - python -m unittest discover -s ${TESTS_DIR} -p 'test_views.py'
+    - python -m unittest discover -s ${TESTS_DIR} -p 'test_functions.py'
+    - psql -h $DBHOST -U $POSTGRES_USER -d $POSTGRES_DB -a -f ${SCRIPTS_DIR}/triggers.sql
+
+
